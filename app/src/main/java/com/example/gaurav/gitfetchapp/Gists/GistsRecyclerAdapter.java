@@ -36,6 +36,9 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
+import static com.example.gaurav.gitfetchapp.Repositories.FileViewActivity.FILE_NAME;
+import static com.example.gaurav.gitfetchapp.Repositories.FileViewActivity.FILE_URL;
+
 /**
  * Created by GAURAV on 10-08-2016.
  */
@@ -46,6 +49,7 @@ public class GistsRecyclerAdapter extends
     private GistsFileRecyclerAdapter gistsFileAdapter;
     private Context mContext;
     private String firstFileUrl;
+    private String firstFileName;
     private GitHubEndpointInterface gitHubEndpointInterface;
     private Filename objects[];
     private boolean fileListExpanded;
@@ -84,25 +88,27 @@ public class GistsRecyclerAdapter extends
         gistsFileAdapter = new GistsFileRecyclerAdapter(mContext,new ArrayList<Filename>());
         holder.gist_file_recyclerview.setAdapter(gistsFileAdapter);
         while(it.hasNext()) {
-            Map.Entry pair = (Map.Entry)it.next();
-            fileNames[count] = (String)pair.getKey();
+            Map.Entry pair = (Map.Entry) it.next();
+            fileNames[count] = (String) pair.getKey();
             //gistsFileAdapter.addItem((String)pair.getKey());
-            objects[count] = (Filename)pair.getValue();
+            objects[count] = (Filename) pair.getValue();
             gistsFileAdapter.addItem(objects[count]);
-            Log.v(TAG,"filename: = "+ objects[count].getFilename());
             count++;
         }
-        firstFileUrl = objects[0].getRawUrl();
 
-        Picasso.with(mContext)
-                .load(gistsJsons.get(position).getOwner().getAvatarUrl())
-                .transform(new CircleTransform())
-                .into(holder.login_avatar_imageView);
+        if(gistsJsons.get(position).getOwner() != null) {
 
-        holder.login_filename_button.setText(String.format(mContext.getResources().getString(
-                R.string.login_filename),gistsJsons.get(position).getOwner().getLogin(),
-                fileNames[0]));
+            Picasso.with(mContext)
+                    .load(gistsJsons.get(position).getOwner().getAvatarUrl())
+                    .transform(new CircleTransform())
+                    .into(holder.login_avatar_imageView);
+
+            holder.login_filename_button.setText(String.format(mContext.getResources().getString(
+                    R.string.login_filename), gistsJsons.get(position).getOwner().getLogin(),
+                    fileNames[0]));
+        }
         holder.login_filename_button.setTypeface(tf_1);
+
         Spanned text = Html.fromHtml("created on "+"<b>"+ Utility.formatDateString(
                 gistsJsons.get(position).getCreatedAt())+"</b>");
         holder.gist_created_textView.setText(text);
@@ -119,13 +125,13 @@ public class GistsRecyclerAdapter extends
 
     @Override
     public int getItemCount() {
-
+        Log.v(TAG,"gists size "+gistsJsons.size());
         if (gistsJsons != null)
             return gistsJsons.size();
         return 0;
     }
 
-    private void fetchFileContents(String download_url){
+    private void fetchFileContents(String download_url, final String fileName){
         gitHubEndpointInterface = ServiceGenerator.createService(GitHubEndpointInterface.class);
         Call<ResponseBody> call = gitHubEndpointInterface.downloadFileWithDynamicUrlSync(download_url);
         call.enqueue(new Callback<ResponseBody>() {
@@ -153,7 +159,8 @@ public class GistsRecyclerAdapter extends
                     Log.v(TAG,sb.toString());
                     //file_name_textview.setText(sb.toString());
                     Intent intent = new Intent(mContext,FileViewActivity.class);
-                    intent.putExtra(Intent.EXTRA_TEXT,sb.toString());
+                    intent.putExtra(FILE_NAME,fileName);
+                    intent.putExtra(FILE_URL,sb.toString());
                     mContext.startActivity(intent);
                     //boolean writtenToDisk = writeResponseBodyToDisk(response.body());
                     //Log.d(TAG, "file download was a success? " + writtenToDisk);
@@ -189,13 +196,6 @@ public class GistsRecyclerAdapter extends
 
             login_filename_button = (TextView) view.findViewById(R.id.login_filename_button);
             //login_filename_button.setTypeface(tf_1);
-            login_filename_button.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    Log.v(TAG,"login filename button: "+firstFileUrl);
-                    fetchFileContents(firstFileUrl);
-                }
-            });
             gist_created_textView =  (TextView) view.findViewById(R.id.gist_created_text);
             gist_created_textView.setTypeface(tf_2);
             gist_file_textView =  (TextView) view.findViewById(R.id.gist_files_text);
@@ -212,6 +212,7 @@ public class GistsRecyclerAdapter extends
             gist_file_recyclerview.setLayoutManager(layoutManager);
             gist_file_recyclerview.setOnClickListener(this);
             gist_file_textView.setOnClickListener(this);
+            login_filename_button.setOnClickListener(this);
         }
 
         @Override

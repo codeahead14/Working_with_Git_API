@@ -32,7 +32,11 @@ import com.google.android.gms.analytics.HitBuilders;
 import com.google.android.gms.analytics.Tracker;
 import com.squareup.picasso.Picasso;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.Locale;
 import java.util.Set;
 
 import butterknife.BindView;
@@ -49,6 +53,7 @@ public class UserInfoActivity extends AppCompatActivity implements PopupMenu.OnM
     private final static String BASE_API_URL = "https://api.github.com/";
     private final static String SAVE_STARRED = "save_starred";
     public final static String REPO_URL = "repo_url";
+    public static final String dateFormat_2 = "dd MMM yyyy";
     private static int num_starred = 0;
     private Tracker mTracker;
     private GitHubEndpointInterface gitHubEndpointInterface;
@@ -57,6 +62,7 @@ public class UserInfoActivity extends AppCompatActivity implements PopupMenu.OnM
     private InterstitialAd mInterstitialAd;
     private Set<String> following;
     private String userName;
+    private Snackbar connectionSnackbar;
 
     @BindView(R.id.toolbar) Toolbar toolbar;
     @BindView(R.id.user_login_name) TextView user_login_textView;
@@ -72,13 +78,18 @@ public class UserInfoActivity extends AppCompatActivity implements PopupMenu.OnM
     @BindView(R.id.user_following) TextView user_following_textView;
     //@BindView(R.menu.user_info_menu) Menu menu;
 
-    @OnClick(R.id.fab) void onClick(View view){
+    @OnClick(R.id.user_activity_fab) void onClick(View view){
         if(mInterstitialAd.isLoaded()){
             Log.v(TAG,"Interstitial Ready");
         }
-        Intent intent = new Intent(this, PublicUserRepoActivity.class);
-        intent.putExtra(REPO_URL,userItem.getReposUrl());
-        startActivity(intent);
+
+        if(Utility.hasConnection(UserInfoActivity.this)) {
+            Intent intent = new Intent(this, PublicUserRepoActivity.class);
+            intent.putExtra(REPO_URL, userItem.getReposUrl());
+            startActivity(intent);
+        }else{
+            Toast.makeText(this, getResources().getString(R.string.notOnline), Toast.LENGTH_SHORT).show();
+        }
     }
 
     @OnClick(R.id.more_vert_button) void showPopUp(View v){
@@ -158,9 +169,9 @@ public class UserInfoActivity extends AppCompatActivity implements PopupMenu.OnM
         mTracker = application.getDefaultTracker();
         //toolbar.setBackgroundColor(getResources().getColor(R.color.white));
         ButterKnife.bind(this);
+
         mInterstitialAd = new InterstitialAd(this);
         mInterstitialAd.setAdUnitId("ca-app-pub-3940256099942544/1033173712");
-
         mInterstitialAd.setAdListener(new AdListener() {
             @Override
             public void onAdClosed() {
@@ -180,7 +191,8 @@ public class UserInfoActivity extends AppCompatActivity implements PopupMenu.OnM
         Intent intent = getIntent();
         if(intent != null && intent.hasExtra(PostLoginActivity.USER_DETAILS)) {
             userItem = intent.getParcelableExtra(PostLoginActivity.USER_DETAILS);
-            userName = userItem.getLogin();
+            if (userItem != null )
+                userName = userItem.getLogin();
             if(savedInstanceState != null) {
                 num_starred = savedInstanceState.getInt(SAVE_STARRED);
                 user_starred_textView.setText(Integer.toString(num_starred));
@@ -259,7 +271,16 @@ public class UserInfoActivity extends AppCompatActivity implements PopupMenu.OnM
         else
             user_blog_textView.setVisibility(View.GONE);
 
-        Spanned joinedText = Html.fromHtml("Joined on "+"<b>"+Utility.formatDateString(item.getCreatedAt())+"</b>");
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH);
+        SimpleDateFormat outputFormat = new SimpleDateFormat(dateFormat_2, Locale.ENGLISH);
+        String joined_time;
+        try {
+            joined_time = outputFormat.format(sdf.parse(item.getCreatedAt()));
+            //return outputFormat.format(sdf.parse(input));
+        } catch (ParseException e) {
+            joined_time = e.getMessage();
+        }
+        Spanned joinedText = Html.fromHtml("Joined on "+"<b>"+joined_time+"</b>");
         user_joined_textView.setText(joinedText);
         //Log.v(TAG,"joined on "+item.getFollowers());
         //TextView user_followers_textView = (TextView) findViewById(R.id.user_followers);

@@ -26,20 +26,10 @@ android {
             signingConfig signingConfigs.config
         }
     }
-    productFlavors {
-        free {
-            applicationId "com.example.gaurav.gitfetchapp.free"
-        }
-        paid {
-            applicationId "com.example.gaurav.gitfetchapp.paid"
-        }
-    }
 }
 
 dependencies {
     compile fileTree(include: ['*.jar'], dir: 'libs')
-    testCompile 'junit:junit:4.12'
-    apt 'com.jakewharton:butterknife-compiler:8.2.1'
     //Parsing xml/atom feed using retrofit
     compile('com.squareup.retrofit2:converter-simplexml:2.1.0') {
         exclude group: 'xpp3', module: 'xpp3'
@@ -55,8 +45,18 @@ dependencies {
     // UI Libraries
 
     // Recyclerview Item animation
-    compile 'com.google.android.gms:play-services-analytics:9.4.0'
-    compile 'com.google.firebase:firebase-ads:9.4.0'
+    compile files('libs/txtmark-0.13.jar')
+
+    // Libraries for progress bar
+    compile('com.mikepenz:fastadapter:1.8.2@aar') {
+        transitive = true
+    }
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    // Because RxAndroid releases are few and far between, it is recommended you also
+// explicitly depend on RxJava's latest version for bug fixes and new features.
+    // If you want to use the GPU Filters
+    compile 'com.google.android.gms:play-services-analytics:10.2.4'
+    compile 'com.google.firebase:firebase-ads:10.2.4'
     compile 'com.squareup:otto:1.3.8'
     compile 'com.android.support:appcompat-v7:24.2.0'
     compile 'com.android.support:gridlayout-v7:24.2.0'
@@ -74,14 +74,16 @@ dependencies {
     compile 'com.roger.catloadinglibrary:catloadinglibrary:1.0.1'
     compile 'com.wang.avi:library:2.1.3'
     compile 'us.feras.mdv:markdownview:1.1.0'
-    compile 'com.mukesh:markdownview:1.0.0'
-    compile files('libs/txtmark-0.13.jar')
-
-    // Libraries for progress bar
     compile 'me.zhanghai.android.materialprogressbar:library:1.1.7'
-    compile('com.mikepenz:fastadapter:1.8.2@aar') {
-        transitive = true
-    }
+    compile 'com.github.fiskurgit:MarkdownView:1.1.0'
+    compile 'io.reactivex:rxandroid:1.2.1'
+    compile 'io.reactivex:rxjava:1.1.6'
+    compile 'com.squareup.retrofit2:adapter-rxjava:2.0.2'
+    compile 'jp.wasabeef:picasso-transformations:2.1.0'
+    compile 'jp.co.cyberagent.android.gpuimage:gpuimage-library:1.4.1'
+    compile 'me.grantland:autofittextview:0.2.+'
+    testCompile 'junit:junit:4.12'
+    apt 'com.jakewharton:butterknife-compiler:8.2.1'
 }
 
 apply plugin: 'com.google.gms.google-services'

@@ -1,6 +1,7 @@
 package com.example.gaurav.gitfetchapp.Issues;
 
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Typeface;
 import android.support.v7.widget.RecyclerView;
 import android.text.Html;
@@ -16,6 +17,7 @@ import com.example.gaurav.gitfetchapp.Events.IssueCommentPayload.Issue;
 import com.example.gaurav.gitfetchapp.IssuesFragment;
 import com.example.gaurav.gitfetchapp.R;
 import com.example.gaurav.gitfetchapp.RecyclerViewParentAdapter;
+import com.example.gaurav.gitfetchapp.Repositories.RepositoryPagerFragment;
 import com.example.gaurav.gitfetchapp.Utility;
 
 import java.lang.reflect.Array;
@@ -25,20 +27,35 @@ import java.util.List;
 /**
  * Created by GAURAV on 25-08-2016.
  */
-public class IssuesRecyclerAdapter extends RecyclerViewParentAdapter{ //RecyclerView.Adapter<IssuesRecyclerAdapter.IssuesViewHolder>  {
+public class IssuesRecyclerAdapter extends RecyclerViewParentAdapter{
     private static final String TAG = IssuesRecyclerAdapter.class.getName();
     private List<IssueItem> issuesList;
     private Context mContext;
+    private String callFragment;
+    private int loadingIndicator;
+    private int loading_state;
 
-    public interface OnLoadFinished{
-        void OnLoadingFinished();
-    }
-
-    public IssuesRecyclerAdapter(Context context, List<IssueItem> items){
+    public IssuesRecyclerAdapter(Context context, List<IssueItem> items, String callFragment){
         this.mContext = context;
         this.issuesList = items;
+        this.callFragment = callFragment;
     }
 
+    public IssuesRecyclerAdapter(Context context, List<IssueItem> items, String callFragment,
+                                 int loading_state){
+        this.mContext = context;
+        this.issuesList = items;
+        this.callFragment = callFragment;
+        this.loading_state = loading_state;
+    }
+
+    public void updateState(int state){
+        this.loading_state = state;
+    }
+
+    public int getState(){
+        return this.loading_state;
+    }
 
     @Override
     //public IssuesViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
@@ -58,16 +75,15 @@ public class IssuesRecyclerAdapter extends RecyclerViewParentAdapter{ //Recycler
 
     @Override
     public int getItemViewType(int position) {
-        Log.v(TAG,"scrollstate "+ IssuesFragment.loadingIndicator);
-        if(position == issuesList.size()-1 && IssuesFragment.loadingIndicator != 1) {
-            //Log.v(TAG, "loading indicator: " + IssuesFragment.loadingIndicator);
+        if (callFragment.equals(IssuesPagerFragment.TAG)) {
+            loadingIndicator = getState();
+        }else if(callFragment.equals(RepositoryPagerFragment.TAG))
+            loadingIndicator = RepositoryPagerFragment.loadingIndicator;
+        if(position == issuesList.size()-1 && loadingIndicator != 1) {
             return VIEW_PROG;
         }else {
-            //Log.v(TAG, "loading indicator in ITEM VIEW: " + IssuesFragment.loadingIndicator);
             return VIEW_ITEM;
         }
-        //Log.v(TAG,"position "+position);
-        //return position != (issuesList.size()) ? VIEW_ITEM : VIEW_PROG;
     }
 
     @Override
@@ -78,6 +94,7 @@ public class IssuesRecyclerAdapter extends RecyclerViewParentAdapter{ //Recycler
         if(viewHolder instanceof IssuesViewHolder) {
             IssuesViewHolder holder = (IssuesViewHolder) viewHolder;
             holder.issues_title.setText(issuesList.get(position).getTitle());
+            holder.issues_title.setTypeface(tf_1);
             String action = "open";
 
             if (issuesList.get(position).getState().compareTo("open") == 0 ||
@@ -90,9 +107,10 @@ public class IssuesRecyclerAdapter extends RecyclerViewParentAdapter{ //Recycler
                 holder.issues_image_icon.setImageResource(R.drawable.issue_closed_16x16);
             }
             Spanned str = Html.fromHtml("<b>#" + issuesList.get(position).getNumber() + "</b> " +
-                    action + " by <b>" + issuesList.get(position).getUser().getLogin() + "</b> on <b>" +
+                    action + " by <b>" + issuesList.get(position).getUser().getLogin() + " " +
                     Utility.formatDateString(issuesList.get(position).getCreatedAt()) + "</b>");
             holder.issues_updated_desc.setText(str);
+            holder.issues_updated_desc.setTypeface(tf_2);
         }else if(viewHolder instanceof ProgressBarViewHolder){
             ((ProgressBarViewHolder) viewHolder).materialProgressBar.setIndeterminate(true);
         }
@@ -100,13 +118,15 @@ public class IssuesRecyclerAdapter extends RecyclerViewParentAdapter{ //Recycler
 
     @Override
     public int getItemCount() {
-        if (issuesList.size() != 0)
+        if (issuesList.size() != 0) {
             return issuesList.size();
+        }
         return 0;
     }
 
     public void addItem(IssueItem item){
         issuesList.add(item);
+        Log.v(TAG,"Adding item");
         notifyItemInserted(issuesList.size()-1);
     }
 
@@ -114,7 +134,7 @@ public class IssuesRecyclerAdapter extends RecyclerViewParentAdapter{ //Recycler
         issuesList.clear();
     }
 
-    public class IssuesViewHolder extends RecyclerView.ViewHolder{
+    public class IssuesViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener{
         private ImageView issues_image_icon;
         private TextView issues_title;
         private TextView issues_updated_desc;
@@ -124,6 +144,16 @@ public class IssuesRecyclerAdapter extends RecyclerViewParentAdapter{ //Recycler
             issues_image_icon = (ImageView) view.findViewById(R.id.issues_image_icon);
             issues_title = (TextView) view.findViewById(R.id.issues_title);
             issues_updated_desc = (TextView) view.findViewById(R.id.issues_updated_desc);
+
+            view.setOnClickListener(this);
+        }
+
+        @Override
+        public void onClick(View view){
+            int clickPos = getAdapterPosition();
+            Intent intent = new Intent(mContext,IssueActivity.class);
+            intent.putExtra(IssueActivity.ISSUE_CONTENTS,issuesList.get(clickPos));
+            mContext.startActivity(intent);
         }
     }
 }

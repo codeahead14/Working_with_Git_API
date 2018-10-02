@@ -5,6 +5,7 @@ import android.util.Base64;
 import android.util.Log;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
@@ -12,6 +13,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Retrofit;
+import retrofit2.adapter.rxjava.RxJavaCallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
 
 /**
@@ -21,6 +23,7 @@ public class ServiceGenerator {
     public static final String WEB_BASE_URL = "https://github.com/"; //"http://api.github.com/";
     public static final String API_BASE_URL = "https://api.github.com";
     private static final String TAG = ServiceGenerator.class.getName();
+    private static final int CONNECTION_TIMEOUT = 20;
 
     // Add the interceptor to OkHttpClient
     private static OkHttpClient.Builder httpClient = new OkHttpClient.Builder();
@@ -41,6 +44,11 @@ public class ServiceGenerator {
             final String basic =
                     "Basic " + Base64.encodeToString(credentials.getBytes(), Base64.NO_WRAP);
 
+            /*Request request = new Request.Builder()
+                    .header("Authorization", basic)
+                    .header("Accept", "application/json")
+                    .build();*/
+
             //Log.v(TAG,basic);
             httpClient.addInterceptor(new Interceptor() {
                 @Override
@@ -57,11 +65,15 @@ public class ServiceGenerator {
                     return chain.proceed(request);
                 }
             });
+            //httpClient.readTimeout(CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS);
         }
         HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
         interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
         OkHttpClient client = httpClient.addInterceptor(interceptor).build();
-        Retrofit retrofit = builder.client(client).build();
+        Retrofit retrofit = builder
+                .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
+                .addConverterFactory(GsonConverterFactory.create())
+                .client(client).build();
         return retrofit.create(serviceClass);
     }
 
@@ -90,7 +102,10 @@ public class ServiceGenerator {
         HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
         interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
         OkHttpClient client = httpClient.addInterceptor(interceptor).build();
-        Retrofit retrofit = builder.client(client).build();
+        Retrofit retrofit = builder
+                .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
+                .addConverterFactory(GsonConverterFactory.create())
+                .client(client).build();
         return retrofit.create(serviceClass);
     }
 

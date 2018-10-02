@@ -1,18 +1,22 @@
 package com.example.gaurav.gitfetchapp;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
 import android.net.Uri;
-import android.preference.PreferenceManager;
-import android.support.v4.app.Fragment;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
+import android.support.design.widget.Snackbar;
+import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.roger.catloadinglibrary.CatLoadingView;
@@ -23,6 +27,7 @@ import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 import butterknife.Unbinder;
+import okhttp3.internal.Util;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -35,41 +40,45 @@ public class MainActivityFragment extends Fragment {
     private View rootView;
     private static CatLoadingView catView;
     private Unbinder unbinder;
-    private final String clientId = "";
-    private final String clientSecret = "" +
-            "Revoke all user tokens";
+    private final String clientId = "ENTER YOUR CLIENT ID HERE";
+    private final String clientSecret = "ENTER YOUR CLIENT SECRET HERE";
     private final String redirectUri = "welcome://com.project.github";
     private String userNameField = null;
     private String passwordField = null;
     private SharedPreferences prefs;
+    private Snackbar connectionSnackbar;
+    private BroadcastReceiver broadcastReceiver;
 
-    public static String loginName = null;
-
-    @BindView(R.id.email) EditText userEmail;
-    @BindView(R.id.pass) EditText userPassword;
+    @BindView(R.id.email)
+    EditText userEmail;
+    @BindView(R.id.pass)
+    EditText userPassword;
 
     public MainActivityFragment() {
     }
 
     @Override
-    public void onCreate(Bundle savedInstanceState){
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         catView = new CatLoadingView();
+        Log.v(TAG,"oncreate");
     }
 
     @Override
-    public void onDestroyView(){
+    public void onDestroyView() {
         super.onDestroyView();
-        if(unbinder!=null)
+        if (unbinder != null)
             unbinder.unbind();
     }
 
-    @OnClick(R.id.loginbutton) void submit(){
-        userNameField = ""; //userEmail.getText().toString();
-        passwordField = ""; //userPassword.getText().toString();
-        String[] scopes = {"user","public_repo","repo","delete_repo","gist"};
+    @OnClick(R.id.loginbutton)
+    void submit() {
+        userNameField = userEmail.getText().toString();
+        passwordField = userPassword.getText().toString();
 
-        if(userNameField.matches("") || passwordField.matches("")){
+        String[] scopes = {"user", "public_repo", "repo", "delete_repo", "gist"};
+
+        if (userNameField.isEmpty() || passwordField.isEmpty()) {
             Toast.makeText(getActivity(), "Cannot Leave UserName/Password Blank",
                     Toast.LENGTH_SHORT).show();
         } else {
@@ -83,35 +92,42 @@ public class MainActivityFragment extends Fragment {
             loginPost.setClient_secret(clientSecret);
             Call<LoginJson> call = gitInterface.getLoginCode(loginPost);
 
-            if(Utility.hasConnection(getContext())) {
-                catView.show(getFragmentManager(),TAG);
+            if (Utility.hasConnection(getContext())) {
+                catView.show(getFragmentManager(), TAG);
                 call.enqueue(new Callback<LoginJson>() {
                     @Override
                     public void onResponse(Call<LoginJson> call, Response<LoginJson> response) {
-                        LoginJson item = response.body();
-                        Log.v(TAG,"response: "+item.getScopes());
-                        if (item.getToken() != null) {
-                            AccessToken.getInstance().setAccessToken(item.getToken());
-                            prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
-                            SharedPreferences.Editor editor = prefs.edit();
-                            editor.putString(PreLoginDeciderActivity.ACCESS_TOKEN_KEY, item.getToken());
-                            editor.putString(PreLoginDeciderActivity.USERNAME_KEY, userNameField);
-                            PreLoginDeciderActivity.setLoginName(userNameField);
-                            editor.apply();
+                        if(response.isSuccessful()) {
+                            LoginJson item = response.body();
+                            Log.v(TAG,"received response ");
+                            if (item.getToken() != null) {
+                                AccessToken.getInstance().setAccessToken(item.getToken());
+                                prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+                                SharedPreferences.Editor editor = prefs.edit();
+                                editor.putString(PreLoginDeciderActivity.ACCESS_TOKEN_KEY, item.getToken());
+                                editor.putString(PreLoginDeciderActivity.USERNAME_KEY, userNameField);
+                                PreLoginDeciderActivity.setLoginName(userNameField);
+                                editor.apply();
+                            }
+                            catView.dismiss();
+                            Intent intent = new Intent(getActivity(), PostLoginActivity.class);
+                            //intent.putExtra(Intent.EXTRA_TEXT,new String[]{userNameField, item.getToken()});
+                            startActivity(intent);
+                            getActivity().finish();
+                        } else{
+                            Log.v(TAG,"response "+response.message());
+                            Toast.makeText(getActivity(), "Bad Credentials", Toast.LENGTH_LONG).show();
+                            catView.dismiss();
                         }
-                        catView.dismiss();
-                        Intent intent = new Intent(getActivity(), PostLoginActivity.class);
-                        //intent.putExtra(Intent.EXTRA_TEXT,new String[]{userNameField, item.getToken()});
-                        startActivity(intent);
-                        getActivity().finish();
                     }
 
                     @Override
                     public void onFailure(Call<LoginJson> call, Throwable t) {
-
+                        Log.v(TAG,"Failure "+t.getMessage());
+                        catView.dismiss();
                     }
                 });
-            }else
+            } else
                 Toast.makeText(getContext(), getContext().getResources().getString(R.string.notOnline), Toast.LENGTH_LONG).show();
         }
     }
@@ -120,14 +136,41 @@ public class MainActivityFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         rootView = inflater.inflate(R.layout.fragment_main, container, false);
-        ButterKnife.bind(this,rootView);
+        ButterKnife.bind(this, rootView);
 
+        connectionSnackbar = Snackbar.make(rootView, getResources().getString(R.string.notOnline),
+                Snackbar.LENGTH_INDEFINITE);
+        if(!Utility.hasConnection(getContext())) {
+            connectionSnackbar.setAction(R.string.network_settings, new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    startActivity(new Intent(WifiManager.ACTION_PICK_WIFI_NETWORK));
+                }
+            });
+            connectionSnackbar.setActionTextColor(getResources().getColor(R.color.teal300));
+            connectionSnackbar.show();
+        }
         return rootView;
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        broadcastReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if(Utility.hasConnection(context)){
+                    if(connectionSnackbar != null){
+                        connectionSnackbar.dismiss();
+                    }
+                }else if(!Utility.hasConnection(context)){
+                    if(connectionSnackbar != null){
+                        connectionSnackbar.show();
+                    }
+                }
+            }
+        };
+        getActivity().registerReceiver(broadcastReceiver,new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
 
         // the intent filter defined in AndroidManifest will handle the return from ACTION_VIEW intent
         Uri uri = getActivity().getIntent().getData();
@@ -139,11 +182,11 @@ public class MainActivityFragment extends Fragment {
                 // get access token
                 GitHubEndpointInterface loginService =
                         ServiceGenerator.createService(GitHubEndpointInterface.class, clientId, clientSecret);
-                Call<AccessToken> call = loginService.getAccessToken(clientId, clientSecret,code);
+                Call<AccessToken> call = loginService.getAccessToken(clientId, clientSecret, code);
 
                 try {
                     AccessToken accessToken = call.execute().body();
-                } catch (IOException e ){
+                } catch (IOException e) {
                     // handle error
                 }
             } else if (uri.getQueryParameter("error") != null) {
@@ -151,66 +194,10 @@ public class MainActivityFragment extends Fragment {
             }
         }
     }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        getActivity().unregisterReceiver(broadcastReceiver);
+    }
 }
-
-
-    /*Button loginButton = (Button) rootView.findViewById(R.id.loginbutton);
-loginButton.setOnClickListener(new View.OnClickListener() {
-@Override
-public void onClick(View v) {
-        String userNameField = userName.getText().toString();
-        String passwordField = password.getText().toString();
-        if(userNameField.matches("") || passwordField.matches("")){
-        Toast.makeText(getActivity(), "Cannot Leave UserName/Password Blank",
-        Toast.LENGTH_SHORT).show();
-        } else {
-        //Retrofit retrofit = new Retrofit.Builder()
-        //      .baseUrl("https://api.github.com")
-        //    .addConverterFactory(GsonConverterFactory.create())
-        //  .build();
-        GitHubEndpointInterface gitInterface = ServiceGenerator.createService(
-        GitHubEndpointInterface.class, userNameField, passwordField);
-                    /*Call<AccessToken> call = gitInterface.getLoginCode(userNameField,
-                            passwordField, clientId);
-        //Call<String> call = gitInterface.getLoginCode("note");//,clientId,clientSecret);
-        LoginPost loginPost = new LoginPost();
-        loginPost.setScopes(null);
-        loginPost.setNote("myapp");
-        loginPost.setNote_url(null);
-        loginPost.setClient_id(clientId);
-        loginPost.setClient_secret(clientSecret);
-        Call<LoginJson> call = gitInterface.getLoginCode(loginPost);
-        Log.v(TAG, call.toString());
-
-        call.enqueue(new Callback<LoginJson>() {
-@Override
-public void onResponse(Call<LoginJson> call, Response<LoginJson> response) {
-        LoginJson item=response.body();
-        responseBody.setText(item.getToken());
-        }
-
-@Override
-public void onFailure(Call<LoginJson> call, Throwable t) {
-        //Handle failure
-        }
-        });*/
-
-                    /*GitHubClient client = new GitHubClient();
-                    client.setCredentials(userNameField, passwordField);
-
-                    String description = "GitFork - " + Build.MANUFACTURER + " " + Build.MODEL;
-                    String fingerprint = Settings.Secure.ANDROID_ID;
-                    if (fingerprint == null) {
-                        fingerprint = Build.FINGERPRINT;
-                    }
-                    int index = 1;
-                    OAuthService authService = new OAuthService(client);*/
-
-
-                /*Intent intent = new Intent(
-                        Intent.ACTION_VIEW,
-                        Uri.parse(ServiceGenerator.WEB_BASE_URL + "/login/oauth/authorize" + "?client_id=" + clientId
-                                + "&redirect_uri=" + redirectUri));
-                Log.v(TAG,Uri.parse(ServiceGenerator.WEB_BASE_URL + "/login/oauth/authorize" + "?client_id=" + clientId
-                        + "&redirect_uri=" + redirectUri).toString());
-                startActivity(intent);*/

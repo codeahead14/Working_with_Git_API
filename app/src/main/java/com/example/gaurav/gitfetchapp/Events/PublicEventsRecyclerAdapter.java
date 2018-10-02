@@ -88,7 +88,8 @@ public class PublicEventsRecyclerAdapter extends RecyclerViewParentAdapter{
 
     @Override
     public int getItemViewType(int position) {
-        if(position == eventsJsonArrayList.size()-1 && IssuesFragment.loadingIndicator != 1) {
+        if(position == eventsJsonArrayList.size()-1 && PrivateFeedsFragment.loadingEvents != 1) {
+            Log.v(TAG,"View PROG");
             return VIEW_PROG;
         }else {;
             return VIEW_ITEM;
@@ -168,6 +169,7 @@ public class PublicEventsRecyclerAdapter extends RecyclerViewParentAdapter{
                 description = String.format(res.getString(R.string.fork_event),
                         ((ForkPayload) payload).getForkee().getFullName());
                 description2 = android.text.Html.fromHtml("forked " + "<b>" +
+                         eventsJsonArrayList.get(position).getRepo().getName() + "</b>" + " to " + "<b>" +
                         ((ForkPayload) payload).getForkee().getFullName() + "</b>");
             } else if (payload instanceof GollumEventPayload) {
                 description = String.format(res.getString(R.string.gollum_event),
@@ -180,19 +182,19 @@ public class PublicEventsRecyclerAdapter extends RecyclerViewParentAdapter{
                         " page at " +
                         "<b>" + ((GollumEventPayload) payload).getPages().get(0).getHtmlUrl() + "</b>");
             } else if (payload instanceof IssueEventPayload) {
-                description = String.format(res.getString(R.string.issue_event),
+                /*description = String.format(res.getString(R.string.issue_event),
                         ((IssueEventPayload) payload).getAction(),
                         ((IssueEventPayload) payload).getIssue().getNumber(),
-                        eventsJsonArrayList.get(position).getRepo().getName());
+                        eventsJsonArrayList.get(position).getRepo().getName());*/
                 description2 = android.text.Html.fromHtml("<b>" +
                         ((IssueEventPayload) payload).getAction() + "</b>" + " issue " +
                         "<b>" + ((IssueEventPayload) payload).getIssue().getNumber() + "</b>" +
                         "<b>" + eventsJsonArrayList.get(position).getRepo().getName() + "</b>");
             } else if (payload instanceof PullRequestPayload) {
-                description = String.format(res.getString(R.string.pull_request_event),
+                /*description = String.format(res.getString(R.string.pull_request_event),
                         ((PullRequestPayload) payload).getAction(),
                         ((PullRequestPayload) payload).getNumber(),
-                        eventsJsonArrayList.get(position).getRepo().getName());
+                        eventsJsonArrayList.get(position).getRepo().getName());*/
                 description2 = android.text.Html.fromHtml("<b>" +
                         ((PullRequestPayload) payload).getAction() + "</b>" + " pull request " +
                         "<b>" + ((PullRequestPayload) payload).getNumber() + "</b>" + " at " +

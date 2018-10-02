@@ -8,14 +8,14 @@
     <application
         android:name=".GooglePlayServices.TrackerApplication"
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/ic_app_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
             android:name=".PreLoginDeciderActivity"
             android:label="@string/app_name"
-            android:theme="@style/AppTheme.NoActionBar">
+            android:theme="@style/AppTheme.FullScreen">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -26,11 +26,11 @@
             android:name=".MainActivity"
             android:label="MainActivity"
             android:noHistory="true"
-            android:theme="@style/AppTheme.NoActionBar"></activity>
+            android:theme="@style/AppTheme.NoActionBar" />
         <activity
             android:name=".PostLoginActivity"
             android:label="@string/title_activity_post_login"
-            android:theme="@style/AppTheme.NoActionBar"></activity>
+            android:theme="@style/AppTheme.NoActionBar" />
         <activity
             android:name=".Repositories.RepositoryDetailActivity"
             android:label="@string/title_activity_repository_detail"
@@ -59,6 +59,10 @@
             android:name=".UserInfo.PublicUserRepoActivity"
             android:label="@string/respositories"
             android:theme="@style/Theme.AppCompat.Light.Dialog" />
+        <activity
+            android:name=".Repositories.RepositoriesSettingsActivity"
+            android:label="@string/respositories"
+            android:theme="@style/Theme.AppCompat.Light.DarkActionBar" />
 
         <provider
             android:name=".RepositoryDataBase.RepositoryProvider"
@@ -81,10 +85,9 @@
         <service
             android:name=".Widgets.RepositoryWidgetRemoteService"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
-
         <service
             android:name=".IntentServices.RepositoryDetailsService"
-            android:exported="false"/>
+            android:exported="false" />
 
         <receiver
             android:name="com.google.android.gms.analytics.AnalyticsReceiver"
@@ -106,7 +109,11 @@
         <activity
             android:name=".MarkdownViewActivity"
             android:label="@string/title_activity_markdown_view"
-            android:theme="@style/AppTheme.NoActionBar"></activity>
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".Issues.IssueActivity"
+            android:label="@string/title_activity_issue"
+            android:theme="@style/AppTheme" />
     </application>
 
 </manifest>

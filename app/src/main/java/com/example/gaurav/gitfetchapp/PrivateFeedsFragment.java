@@ -1,7 +1,13 @@
 package com.example.gaurav.gitfetchapp;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
 import android.net.Credentials;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -16,6 +22,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,6 +34,7 @@ import com.example.gaurav.gitfetchapp.Feeds.FeedsJson;
 import com.example.gaurav.gitfetchapp.Feeds.TimelineJson.Feed;
 import com.example.gaurav.gitfetchapp.Repositories.EventsRecyclerAdapter;
 import com.example.gaurav.gitfetchapp.Repositories.UserRepoJson;
+import com.google.android.gms.analytics.HitBuilders;
 import com.google.gson.annotations.SerializedName;
 
 import java.io.IOException;
@@ -57,12 +66,19 @@ public class PrivateFeedsFragment extends Fragment implements OnDataFetchFinishe
     private PublicEventsRecyclerAdapter eventsRecyclerAdapter;
     private static int PAGE_NUM = 1;
     private String userName;
-    private boolean loading = false;
+    public static int loadingEvents = 0;
+    private BroadcastReceiver broadcastReceiver;
+    private boolean viewLoaded = false;;
+    private boolean connectionLostFlag;
 
     @BindView(R.id.privatefeeds_recyclerview)
     RecyclerView recyclerView;
     @BindView(R.id.privatefeeds_progress_bar)
     MaterialProgressBar materialProgressBar;
+    @BindView(R.id.pvt_feeds_networkButton)
+    Button networkButton;
+    @BindView(R.id.pvt_feeds_networkLayout)
+    RelativeLayout networkLayout;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -70,20 +86,20 @@ public class PrivateFeedsFragment extends Fragment implements OnDataFetchFinishe
         mAccessToken = AccessToken.getInstance();
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
         userName = prefs.getString(PreLoginDeciderActivity.USERNAME_KEY,null);
-
+        //loadingEvents = false;
         eventsRecyclerAdapter = new PublicEventsRecyclerAdapter(getContext(),new ArrayList<EventsJson>());
         PAGE_NUM = 1;
+        viewLoaded = false;
         /*
             Using HTTP Async Task
          */
         if(Utility.hasConnection(getContext())) {
             String url = "https://api.github.com/users/"+userName+"/received_events?page="+PAGE_NUM;
-            Log.v(TAG, url);
             EventsAsyncTask eventsAsyncTask = new EventsAsyncTask(eventsRecyclerAdapter,this);
             eventsAsyncTask.execute(url);
+            //loadingEvents = 1;
             PAGE_NUM += 1;
-        } else
-            Toast.makeText(getContext(),R.string.notOnline,Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
@@ -103,52 +119,74 @@ public class PrivateFeedsFragment extends Fragment implements OnDataFetchFinishe
         //window.setStatusBarColor(getResources().getColor(R.color.deepPurple800));
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        broadcastReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent){
+                if(!Utility.hasConnection(context) && !viewLoaded){
+                    connectionLostFlag = true;
+                    materialProgressBar.setVisibility(View.GONE);
+                    networkLayout.setVisibility(View.GONE);
+                } else if(Utility.hasConnection(context)) {
+                    if( connectionLostFlag) {
+                        connectionLostFlag = false;
+                        networkLayout.setVisibility(View.GONE);
+                        if(rootView != null) {
+                            ViewGroup vg = (ViewGroup) rootView.findViewById(R.id.pvt_feeds_framelayout);
+                            //if (vg != null)
+                                vg.invalidate();
+                        }
+                        if (materialProgressBar != null) {
+                            materialProgressBar.setVisibility(View.VISIBLE);
+                        }
+
+                        /*
+                        Using HTTP Async Task
+                        */
+                        String url = "https://api.github.com/users/" + userName + "/received_events?page=" + PAGE_NUM;
+                        EventsAsyncTask eventsAsyncTask = new EventsAsyncTask(eventsRecyclerAdapter,
+                                PrivateFeedsFragment.this);
+                        eventsAsyncTask.execute(url);
+                        //loadingEvents = 1;
+                        PAGE_NUM += 1;
+                    }
+                }
+            }
+        };
+
+        getActivity().registerReceiver(broadcastReceiver,new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
+    }
+
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_private_feeds,container,false);
         ButterKnife.bind(this,rootView);
-        materialProgressBar.setVisibility(View.VISIBLE);
-        LinearLayoutManager layoutManager = new LinearLayoutManager(getActivity());
-        layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
-        recyclerView.setLayoutManager(layoutManager);
-        recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
-            @Override
-            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
-                super.onScrolled(recyclerView, dx, dy);
-                int lastVisibleItemPosition, itemCount, threshold = 5, previousCount;
-                LinearLayoutManager linearLayoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
-                lastVisibleItemPosition = linearLayoutManager.findLastVisibleItemPosition();
-                itemCount = linearLayoutManager.getItemCount();
-                if(dy > 0 && itemCount - lastVisibleItemPosition < threshold) {
-                    Log.v(TAG,"itemcount and lastVisibleItemPosition"+itemCount+" "+lastVisibleItemPosition);
-                    if(!loading) {
-                        loading = true;
-                        String url = "https://api.github.com/users/"+userName+"/received_events?page="+PAGE_NUM;
-                        EventsAsyncTask eventsAsyncTask = new EventsAsyncTask(eventsRecyclerAdapter,PrivateFeedsFragment.this);
-                        eventsAsyncTask.execute(url);
-                        PAGE_NUM += 1;
-                        Toast.makeText(getContext(), "Approaching end", Toast.LENGTH_SHORT).show();
-                    }
-                }
-            }
 
+        materialProgressBar.setVisibility(View.VISIBLE);
+        networkButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
-                super.onScrollStateChanged(recyclerView, newState);
+            public void onClick(View view) {
+                startActivity(new Intent(WifiManager.ACTION_PICK_WIFI_NETWORK));
             }
         });
 
-        /*recyclerView.addOnScrollListener(new EndlessRecyclerViewScrollListener(layoutManager){
+        LinearLayoutManager layoutManager = new LinearLayoutManager(getActivity());
+        layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
+        recyclerView.setLayoutManager(layoutManager);
+        recyclerView.addOnScrollListener(new EndlessRecyclerViewScrollListener(layoutManager){
             @Override
-            public void onLoadMore(int page, int totalItemsCount) {
-                Log.v(TAG,"On Load More");
+            public void onLoadMore(int page, int totalItemsCount, boolean loading) {
+                loadingEvents = 0;
                 String url = "https://api.github.com/users/"+userName+"/received_events?page="+PAGE_NUM;
                 EventsAsyncTask eventsAsyncTask = new EventsAsyncTask(eventsRecyclerAdapter,PrivateFeedsFragment.this);
                 eventsAsyncTask.execute(url);
                 PAGE_NUM += 1;
             }
-        });*/
+        });
 
         recyclerView.setAdapter( eventsRecyclerAdapter);
 
@@ -157,7 +195,8 @@ public class PrivateFeedsFragment extends Fragment implements OnDataFetchFinishe
 
     @Override
     public void onDataFetchFinishedCallback() {
-        loading = false;
+        loadingEvents = 1;
+        viewLoaded = true;
         materialProgressBar.setVisibility(View.GONE);
     }
 }

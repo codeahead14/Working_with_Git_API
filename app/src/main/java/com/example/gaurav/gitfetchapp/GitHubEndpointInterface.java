@@ -3,6 +3,9 @@ package com.example.gaurav.gitfetchapp;
 import com.example.gaurav.gitfetchapp.Feeds.FeedsJson;
 import com.example.gaurav.gitfetchapp.Feeds.TimelineJson.Feed;
 import com.example.gaurav.gitfetchapp.Gists.GistsJson;
+import com.example.gaurav.gitfetchapp.Issues.IssueCommentsJson;
+import com.example.gaurav.gitfetchapp.Issues.IssueEventsJson;
+import com.example.gaurav.gitfetchapp.Issues.IssueItem;
 import com.example.gaurav.gitfetchapp.Issues.IssuesJson;
 import com.example.gaurav.gitfetchapp.Repositories.BranchDetails.BranchDetailJson;
 import com.example.gaurav.gitfetchapp.Repositories.BranchesJson;
@@ -36,6 +39,7 @@ import retrofit2.http.Path;
 import retrofit2.http.Query;
 import retrofit2.http.QueryMap;
 import retrofit2.http.Url;
+import rx.Observable;
 
 /**
  * Created by GAURAV on 21-07-2016.
@@ -61,7 +65,9 @@ public interface GitHubEndpointInterface {
     Call<ResponseBody> deleteFollowing(@Path("username") String userName);
 
     @GET("/user/repos")
-    Call<ArrayList<UserRepoJson>> getUserRepositories();
+    Call<ArrayList<UserRepoJson>> getUserRepositories(@Query("sort") String sort,
+                                                      @Query("type") String type,
+                                                      @Query("direction") String direction);
 
     @GET("/repos/{owner}/{repo}/branches")
     Call<ArrayList<BranchesJson>> getUserBranches(@Path("owner") String owner,
@@ -93,6 +99,18 @@ public interface GitHubEndpointInterface {
     @GET
     Call<UserRepoJson> getRepoContentsWithUrl(@Url String dynamicUrl);
 
+    @GET
+    Call<ArrayList<IssueEventsJson>> getIssueEventsWithUrl(@Url String dynamicUrl);
+
+    @GET
+    Call<ArrayList<IssueCommentsJson>> getIssueCommentsWithUrl(@Url String dynamicUrl);
+
+    @GET
+    Observable<ArrayList<IssueEventsJson>> getIssueEventsWithUrlRx(@Url String dynamicUrl);
+
+    @GET
+    Observable<ArrayList<IssueCommentsJson>> getIssueCommentsWithUrlRx(@Url String dynamicUrl);
+
     @GET("/repos/{owner}/{repo}/contents/{path}")
     Call<ArrayList<RepoContentsJson>> getRepoContents(@Path("owner") String owner,
                                                       @Path("repo") String repo,
@@ -113,12 +131,12 @@ public interface GitHubEndpointInterface {
 
     // For fetching user repository issues
     @GET ("/repos/{owner}/{repo}/issues")
-    Call<ArrayList<IssuesJson>> getRepoIssues(@Path("owner") String owner,
-                                   @Path("repo") String repo);
+    Call<ArrayList<IssueItem>> getRepoIssues(@Path("owner") String owner,
+                                             @Path("repo") String repo);
 
     // Fetching issues.- Using QueryMap to map optional queries
     @GET ("/search/issues")
-    Call<IssuesJson> getIssues(@Query("q") String options,
+    Call<IssuesJson> getIssues(@Query(value = "q",encoded = true) String options,
                                @Query("page") int pageNumber,
                                @Query("per_page") int numberPerAge);
 
@@ -141,9 +159,13 @@ public interface GitHubEndpointInterface {
     @GET
     Call<ArrayList<StarredRepoJson>> getUserStarredRepos(@Url String url);
 
-    // For accessing Gists
+    // For accessing Private Gists
     @GET("/users/{username}/gists")
     Call<ArrayList<GistsJson>> getPrivateGists(@Path("username") String username);
+
+    // For accessing Public Gists
+    @GET("/gists/public")
+    Call<ArrayList<GistsJson>> getPublicGists();
 
     @FormUrlEncoded
     @POST("login/oauth/access_token")

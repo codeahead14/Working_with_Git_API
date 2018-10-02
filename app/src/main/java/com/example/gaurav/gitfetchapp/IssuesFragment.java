@@ -12,20 +12,29 @@ import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
+import android.support.design.widget.TabLayout;
 import android.support.v4.app.Fragment;
+import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.view.menu.SubMenuBuilder;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
+import android.view.SubMenu;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
@@ -34,6 +43,7 @@ import com.example.gaurav.gitfetchapp.Gists.GistsJson;
 import com.example.gaurav.gitfetchapp.GooglePlayServices.TrackerApplication;
 import com.example.gaurav.gitfetchapp.Issues.IssueItem;
 import com.example.gaurav.gitfetchapp.Issues.IssuesJson;
+import com.example.gaurav.gitfetchapp.Issues.IssuesPagerAdapter;
 import com.example.gaurav.gitfetchapp.Issues.IssuesRecyclerAdapter;
 import com.google.android.gms.analytics.HitBuilders;
 import com.google.android.gms.analytics.Tracker;
@@ -57,30 +67,20 @@ import retrofit2.Response;
  * Created by GAURAV on 25-08-2016.
  */
 public class IssuesFragment extends Fragment implements RecyclerViewScrollListener {
-    @BindView(R.id.fragment_issues_recyclerview)
-    RecyclerView issuesRecyclerView;
-    //@BindView(R.id.issues_empty_cardView)
-    //CardView empty_cardView;
-    @BindView(R.id.networkLayout)
+    private static final String ARG_LIST = "nav_list";
+    /*@BindView(R.id.issues_networkLayout)
     RelativeLayout networkLayout;
-    @BindView(R.id.networkButton)
-    Button networkSettings;
-    @BindView(R.id.issues_progress_bar)
-    MaterialProgressBar materialProgressBar;
+    @BindView(R.id.issues_networkButton)
+    Button networkSettings;*/
 
-    private CardView empty_cardView;
-    private static final String TAG = IssuesFragment.class.getName();
-    private LinearLayoutManager layoutManager;
-    private IssuesRecyclerAdapter issuesRecyclerAdapter;
+    public static final String TAG = IssuesFragment.class.getName();
     Tracker mTracker;
     BroadcastReceiver broadcastReceiver;
     private boolean connectionLostFlag;
-    private static int Tot_Num_issues;
-    public static final int PER_PAGE = 100;
-    public static int PAGE_COUNT = 1;
-    private static String AUTHOR = "author";
-    private static String AUTHOR_NAME = "null";
+    private View rootview;
     private FrameLayout.LayoutParams layoutParams;
+    private IssuesPagerAdapter issuesPagerAdapter;
+    private ViewPager viewPager;
 
     public static int loadingIndicator = 0;
 
@@ -92,51 +92,30 @@ public class IssuesFragment extends Fragment implements RecyclerViewScrollListen
 
     }
 
+    public static IssuesFragment newInstance(ArrayAdapter<String> arrayAdapter) {
+        IssuesFragment fragment = new IssuesFragment();
+        Bundle args = new Bundle();
+        //args(ARG_LIST,arrayAdapter);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        PAGE_COUNT=1;
-        issuesRecyclerAdapter = new IssuesRecyclerAdapter(getContext(), new ArrayList<IssueItem>());
-        fetchIssues();
+        setHasOptionsMenu(false);
     }
 
-    void fetchIssues(){
-                /*
-        Adding Default author parameter to fetch query
-         */
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
-        AUTHOR_NAME = prefs.getString(PreLoginDeciderActivity.USERNAME_KEY,null);
-        String author_params = String.format("%s:%s",AUTHOR,AUTHOR_NAME);
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
 
-        if (Utility.hasConnection(getContext())) {
-            //avLoadingIndicatorView.show();
-            GitHubEndpointInterface gitHubEndpointInterface = ServiceGenerator.createService(
-                    GitHubEndpointInterface.class, AccessToken.getInstance());
-            Call<IssuesJson> call = gitHubEndpointInterface.getIssues(author_params,PAGE_COUNT,30);
-            PAGE_COUNT++;
-            call.enqueue(new Callback<IssuesJson>() {
-                @Override
-                public void onResponse(Call<IssuesJson> call, Response<IssuesJson> response) {
-                    if (response.isSuccessful()) {
-                        loadingIndicator = 1;
-                        IssuesJson issuesResponse = response.body();
-                        if(issuesResponse.getTotalCount() <= 0)
-                            Tot_Num_issues = 0;
-                        List<IssueItem> item = issuesResponse.getItems();
-                        for (IssueItem elem : item)
-                            issuesRecyclerAdapter.addItem(elem);
-                        issuesRecyclerAdapter.notifyDataSetChanged();
-                        materialProgressBar.setVisibility(View.GONE);
-                    }
-                }
+        return super.onOptionsItemSelected(item);
+    }
 
-                @Override
-                public void onFailure(Call<IssuesJson> call, Throwable t) {
-                    Log.v(TAG,"Issues Fetch Failed: "+t.getMessage());
-                }
-
-            });
-        }
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+        inflater.inflate(R.menu.issues_menu,menu);
     }
 
     @Override
@@ -153,6 +132,14 @@ public class IssuesFragment extends Fragment implements RecyclerViewScrollListen
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
         }
+
+        viewPager = (ViewPager) rootview.findViewById(R.id.issues_view_pager);
+        issuesPagerAdapter = new IssuesPagerAdapter(getChildFragmentManager(),getContext());
+        viewPager.setAdapter(issuesPagerAdapter);
+
+        // Give the TabLayout the ViewPager
+        TabLayout tabLayout = (TabLayout)rootview.findViewById(R.id.issues_sliding_tabs);
+        tabLayout.setupWithViewPager(viewPager);
         //window.setStatusBarColor(getResources().getColor(R.color.red900));
         //window.setStatusBarColor(getResources().getColor(R.color.deepPurple800));
     }
@@ -169,17 +156,14 @@ public class IssuesFragment extends Fragment implements RecyclerViewScrollListen
                 if (!Utility.hasConnection(context)) {
                     connectionLostFlag = true;
                     //networkLayout.setVisibility(View.VISIBLE);
-                    Toast.makeText(context, R.string.notOnline, Toast.LENGTH_SHORT).show();
                 } else if (Utility.hasConnection(context)) {
                     if (connectionLostFlag) {
                         connectionLostFlag = false;
                         //networkLayout.setVisibility(View.GONE);
-                        Toast.makeText(context, R.string.online, Toast.LENGTH_SHORT).show();
                     }
                 }
             }
         };
-
         getActivity().registerReceiver(broadcastReceiver, new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
     }
 
@@ -194,36 +178,21 @@ public class IssuesFragment extends Fragment implements RecyclerViewScrollListen
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         layoutParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         layoutParams.gravity = Gravity.BOTTOM;
-        View rootview = inflater.inflate(R.layout.fragment_issues, container, false);
+        rootview = inflater.inflate(R.layout.fragment_issues, container, false);
         ButterKnife.bind(this, rootview);
 
 
         //if(Tot_Num_issues <= 0)
-          //  empty_cardView.setVisibility(View.VISIBLE);
-        networkSettings.setOnClickListener(new View.OnClickListener() {
+        //  empty_cardView.setVisibility(View.VISIBLE);
+        /*networkSettings.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 startActivity(new Intent(WifiManager.ACTION_PICK_WIFI_NETWORK));
             }
-        });
+        });*/
         TrackerApplication application = (TrackerApplication) getActivity().getApplication();
         mTracker = application.getDefaultTracker();
 
-        layoutManager = new LinearLayoutManager(getActivity());
-        layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
-        issuesRecyclerView.setLayoutManager(layoutManager);
-        RecyclerView.ItemDecoration itemDecoration = new
-                DividerItemDecoration(getContext(), DividerItemDecoration.VERTICAL_LIST);
-        issuesRecyclerView.addItemDecoration(itemDecoration);
-        issuesRecyclerView.setAdapter(issuesRecyclerAdapter);
-        issuesRecyclerView.addOnScrollListener(new EndlessRecyclerViewScrollListener(layoutManager) {
-            @Override
-            public void onLoadMore(int page, int totalItemsCount) {
-                //materialProgressBar.setVisibility(View.VISIBLE);
-                loadingIndicator = 0;
-                fetchIssues();
-            }
-        });
         return rootview;
     }
 
